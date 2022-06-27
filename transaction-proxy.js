@@ -2,14 +2,19 @@ function Transaction() {}
 
 Transaction.start = function (data) {
   let delta = {};
+  const keysToDelete = new Set();
 
   const methods = {
-    commit: () => {
-      Object.assign(data, delta);
+    rollback() {
       delta = {};
+      keysToDelete.clear();
     },
-    rollback: () => {
-      delta = {};
+    commit() {
+      Object.assign(data, delta);
+      for (const key of keysToDelete) {
+        delete data[key];
+      }
+      this.rollback();
     },
   };
 
@@ -17,21 +22,30 @@ Transaction.start = function (data) {
     get: (target, name) => {
       if (name === "delta") return delta;
       if (methods.hasOwnProperty(name)) return methods[name];
+      if (keysToDelete.has(name)) return undefined;
       if (delta.hasOwnProperty(name)) return delta[name];
-      return data[name];
+      return target[name];
     },
 
-    set: (obj, prop, value) => {
-      if (data[prop] === value) delete delta[prop];
-      else delta[prop] = value;
+    set: (target, name, value) => {
+      if (target[name] === value) delete delta[name];
+      else delta[name] = value;
+      keysToDelete.delete(name);
       return true;
     },
 
-    ownKeys: () => [...new Set([...Object.keys(data), ...Object.keys(delta)])],
+    deleteProperty: (target, name) => {
+      keysToDelete.add(name);
+      return true;
+    },
+
+    ownKeys: (target) => [
+      ...new Set([...Object.keys(target), ...Object.keys(delta)]),
+    ],
 
     getOwnPropertyDescriptor: (target, name) =>
       Object.getOwnPropertyDescriptor(
-        delta.hasOwnProperty(name) ? delta : data,
+        delta.hasOwnProperty(name) ? delta : target,
         name
       ),
   });
@@ -44,9 +58,11 @@ const transaction = Transaction.start(data);
 transaction.name = "Mao Zedong";
 transaction.born = 1893;
 transaction.age = 19;
+delete transaction.age;
+transaction.age = 24;
 
 // data { name: 'Marcus Aurelius', born: 121 }
 
 transaction.commit();
 
-// data { name: 'Mao Zedong', born: 1893, age: 19 }
+// data { name: 'Mao Zedong', born: 1893, age: 24 }
