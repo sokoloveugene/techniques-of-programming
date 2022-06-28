@@ -1,3 +1,5 @@
+const { schema } = require("./api.schema.js");
+
 const axios = {
   get: (url) => console.log("AXIOS get on ", url),
   delete: (url) => console.log("AXIOS delete on ", url),
@@ -12,9 +14,9 @@ const domains = {
 };
 
 class ApiBuilder {
-  constructor(config) {
+  constructor(schema) {
     this.api = {};
-    this.buildApi(config);
+    this.buildApi(schema);
     this.methods = {
       "[GET]": "get",
       "[DELETE]": "delete",
@@ -25,8 +27,8 @@ class ApiBuilder {
     return this.api;
   }
 
-  buildApi(config, reference = this.api) {
-    for (const [key, value] of Object.entries(config)) {
+  buildApi(schema, reference = this.api) {
+    for (const [key, value] of Object.entries(schema)) {
       const isGroup = typeof value === "object";
 
       if (isGroup) this.buildApi(value, (reference[key] = {}));
@@ -46,33 +48,16 @@ class ApiBuilder {
 
     return {
       httpMethod: this.methods[method],
-      url: url.replace(
-        /{{(.*?)}}/g,
-        (match, $1) => parameters[$1] ?? domains[$1]
-      ),
+      url: url.replace(/{{(.*?)}}/g, (match, $1) => {
+        const [param] = $1.split(":");
+        return parameters[param] ?? domains[param];
+      }),
       payload: parameters.payload,
     };
   }
 }
 
-const config = {
-  heartbeat: "[GET] {{api_v1}}/heartbeat",
-  client: {
-    get: "[GET] {{api_v1}}/customer/{{id}}",
-    update: "[POST] {{api_v2}}/customer/{{id}}?primary={{isPrimary}}",
-  },
-  product: {
-    delete: "[DELETE] {{api_v1}}/product/{{productId}}/{{productType}}",
-    add: {
-      primary:
-        "[POST] {{api_v2}}/product/primary/{{productType}}?subproducts={{hasSubproducts}}",
-      default:
-        "[POST] {{api_v2}}/product/default/{{productType}}?subproducts={{hasSubproducts}}",
-    },
-  },
-};
-
-const api = new ApiBuilder(config);
+const api = new ApiBuilder(schema);
 
 // AXIOS get on  http://localhost:4200/api/customer/123
 api.client.get({
