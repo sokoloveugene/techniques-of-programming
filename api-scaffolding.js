@@ -6,42 +6,31 @@ const axios = {
   patch: (url, data) => console.log("AXIOS patch on ", url, " with ", data),
 };
 
-const methods = {
-  "[GET]": "get",
-  "[DELETE]": "delete",
-  "[POST]": "post",
-  "[PUT]": "put",
-  "[PATCH]": "patch",
-};
-
 const domains = {
   api_v2: "http://localhost:8000",
   api_v1: "http://localhost:4200/api",
-};
-
-const regex = {
-  param: /{{(.*?)}}/g,
 };
 
 class ApiBuilder {
   constructor(config) {
     this.api = {};
     this.buildApi(config);
+    this.methods = {
+      "[GET]": "get",
+      "[DELETE]": "delete",
+      "[POST]": "post",
+      "[PUT]": "put",
+      "[PATCH]": "patch",
+    };
     return this.api;
   }
 
   buildApi(config, reference = this.api) {
-    const pairs = Object.entries(config);
-
-    for (const [key, value] of pairs) {
+    for (const [key, value] of Object.entries(config)) {
       const isGroup = typeof value === "object";
 
-      if (isGroup) {
-        reference[key] = {};
-        this.buildApi(value, reference[key]);
-      } else {
-        reference[key] = this.createHandler(value);
-      }
+      if (isGroup) this.buildApi(value, (reference[key] = {}));
+      else reference[key] = this.createHandler(value);
     }
   }
 
@@ -56,9 +45,9 @@ class ApiBuilder {
     const [method, url] = template.split(" ");
 
     return {
-      httpMethod: methods[method],
+      httpMethod: this.methods[method],
       url: url.replace(
-        regex.param,
+        /{{(.*?)}}/g,
         (match, $1) => parameters[$1] ?? domains[$1]
       ),
       payload: parameters.payload,
@@ -97,8 +86,9 @@ api.client.update({
   payload: { age: 18, hobby: "Java" },
 });
 
-// AXIOS delete on  http://localhost:4200/api/product/_a#d10/pants
-api.product.delete({
-  productId: "_a#d10",
+// AXIOS post on  http://localhost:8000/product/primary/pants?subproducts=true  with  { size: 'S', color: 'black' }
+api.product.add.primary({
+  hasSubproducts: true,
   productType: "pants",
+  payload: { size: "S", color: "black" },
 });
