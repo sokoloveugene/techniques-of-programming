@@ -83,13 +83,13 @@ class ApiBuilder {
   get templateRegex() {
     const methods = Object.keys(ApiBuilder.methods).join("|");
     const domains = Object.keys(ApiBuilder.domains).join("|");
-    const handlers = Object.keys(ApiBuilder.handlers).join("|");
+    const handlers = Object.keys(ApiBuilder.handlers).join("\\b|");
 
     const METHOD = `(${methods})`;
     const DOMAIN = `{{(${domains})}}`;
     const PATH = "[\\w\\/{}:\\=\\?\\&]*";
     const END = "$";
-    const HANDLER = `\\s+=>\\s+(${handlers}|\\s){1,}$`;
+    const HANDLER = `\\s+=>\\s+(\\b${handlers}\\b|\\s){1,}$`;
 
     return new RegExp(`${METHOD}\\s+${DOMAIN}${PATH}(${END}|${HANDLER})`);
   }
