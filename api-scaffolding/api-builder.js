@@ -1,29 +1,42 @@
-const { schema } = require("./api.schema.js");
-
 const axios = {
-  get: (url) => console.log("AXIOS get on ", url),
-  delete: (url) => console.log("AXIOS delete on ", url),
-  post: (url, data) => console.log("AXIOS post on ", url, " with ", data),
-  put: (url, data) => console.log("AXIOS put on ", url, " with ", data),
-  patch: (url, data) => console.log("AXIOS patch on ", url, " with ", data),
-};
-
-const domains = {
-  api_v2: "http://localhost:8000",
-  api_v1: "http://localhost:4200/api",
+  get: (url) => Promise.resolve(`AXIOS get on, ${url}`),
+  delete: (url) => Promise.resolve(`AXIOS delete on, ${url}`),
+  post: (url, data) =>
+    Promise.resolve(`AXIOS post on, ${url} with ${JSON.stringify(data)}`),
+  put: (url, data) =>
+    Promise.resolve(`AXIOS put on, ${url} with ${JSON.stringify(data)}`),
+  patch: (url, data) =>
+    Promise.resolve(`AXIOS patch on, ${url} with ${JSON.stringify(data)}`),
 };
 
 class ApiBuilder {
+  static methods = {
+    GET: "get",
+    DELETE: "delete",
+    POST: "post",
+    PUT: "put",
+    PATCH: "patch",
+  };
+  static domains = {};
+  static handlers = {};
+
+  static setDomains(map) {
+    this.domains = map;
+    return ApiBuilder;
+  }
+
+  static setHandlers(map) {
+    this.handlers = map;
+    return ApiBuilder;
+  }
+
+  static from(schema) {
+    return new ApiBuilder(schema);
+  }
+
   constructor(schema) {
     this.api = {};
     this.buildApi(schema);
-    this.methods = {
-      "[GET]": "get",
-      "[DELETE]": "delete",
-      "[POST]": "post",
-      "[PUT]": "put",
-      "[PATCH]": "patch",
-    };
     return this.api;
   }
 
@@ -37,43 +50,72 @@ class ApiBuilder {
   }
 
   createHandler(template) {
+    this.validate(template);
     return async (params = {}) => {
-      const { httpMethod, url, payload } = this.preprocess(template, params);
-      return axios[httpMethod](url, payload);
+      const { httpMethod, url, payload, handler } = this.preprocess(
+        template,
+        params
+      );
+
+      return axios[httpMethod](url, payload).then(handler);
     };
   }
 
   preprocess(template, parameters = {}) {
-    const [method, url] = template.split(" ");
+    const [method, url, arrow, ...fnNames] = template.split(/\s+/);
 
     return {
-      httpMethod: this.methods[method],
+      httpMethod: ApiBuilder.methods[method],
       url: url.replace(/{{(.*?)}}/g, (match, $1) => {
         const [param] = $1.split(":");
-        return parameters[param] ?? domains[param];
+        return parameters[param] ?? ApiBuilder.domains[param];
       }),
       payload: parameters.payload,
+      handler: this.getComposedHandler(fnNames),
     };
+  }
+
+  getComposedHandler(fnNames) {
+    const handlers = fnNames.map((name) => ApiBuilder.handlers[name]);
+    return (arg) => handlers.reduce((composed, f) => f(composed), arg);
+  }
+
+  get templateRegex() {
+    const methods = Object.keys(ApiBuilder.methods).join("|");
+    const domains = Object.keys(ApiBuilder.domains).join("|");
+    const handlers = Object.keys(ApiBuilder.handlers).join("|");
+
+    const METHOD = `(${methods})`;
+    const DOMAIN = `{{(${domains})}}`;
+    const PATH = "[\\w\\/{}:\\=\\?\\&]*";
+    const END = "$";
+    const HANDLER = `\\s+=>\\s+(${handlers}|\\s){1,}$`;
+
+    return new RegExp(`${METHOD}\\s+${DOMAIN}${PATH}(${END}|${HANDLER})`);
+  }
+
+  logError(template) {
+    const color = "\x1b[33m%s\x1b[0m";
+
+    console.log(color, "Definition is not correct");
+    console.log(color, template);
+    console.log(color, "Please make sure that");
+
+    console.table({
+      Method: `One of: ${Object.keys(ApiBuilder.methods).join(", ")}`,
+      Domain: `One of: ${Object.keys(ApiBuilder.domains).join(", ")}`,
+      Handler: `One of: ${Object.keys(ApiBuilder.handlers).join(", ")}`,
+      Space: `METHOD {{DOMAIN}}/PATH => HANDLER1 HANDLER2`,
+      Arrow: "=>",
+    });
+
+    throw new Error("Can not parse api template");
+  }
+
+  validate(template) {
+    const isValid = this.templateRegex.test(template);
+    if (!isValid) this.logError(template);
   }
 }
 
-const api = new ApiBuilder(schema);
-
-// AXIOS get on  http://localhost:4200/api/customer/123
-api.client.get({
-  id: 123,
-});
-
-// AXIOS post on  http://localhost:8000/customer/123?primary=true  with  { age: 18, hobby: 'Java' }
-api.client.update({
-  id: 123,
-  isPrimary: true,
-  payload: { age: 18, hobby: "Java" },
-});
-
-// AXIOS post on  http://localhost:8000/product/primary/pants?subproducts=true  with  { size: 'S', color: 'black' }
-api.product.add.primary({
-  hasSubproducts: true,
-  productType: "pants",
-  payload: { size: "S", color: "black" },
-});
+module.exports = { ApiBuilder };

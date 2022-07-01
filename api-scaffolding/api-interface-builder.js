@@ -16,6 +16,7 @@ class ApiInterfaceBuilder {
 
   getInterface(name, schema) {
     const parts = [];
+
     parts.push(`export interface ${this.getInterfaceName(name)} {`);
 
     for (const [field, value] of Object.entries(schema)) {
@@ -79,7 +80,7 @@ class ApiInterfaceBuilder {
   }
 
   hasPayload(template) {
-    return ["[POST]", "[PUT]", "[PATCH]"].some((method) =>
+    return ["POST", "PUT", "PATCH"].some((method) =>
       template.startsWith(method)
     );
   }
