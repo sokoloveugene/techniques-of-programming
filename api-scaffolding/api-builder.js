@@ -1,32 +1,16 @@
-const axios = {
-  get: (url) => Promise.resolve(`AXIOS get on, ${url}`),
-  delete: (url) => Promise.resolve(`AXIOS delete on, ${url}`),
-  post: (url, data) =>
-    Promise.resolve(`AXIOS post on, ${url} with ${JSON.stringify(data)}`),
-  put: (url, data) =>
-    Promise.resolve(`AXIOS put on, ${url} with ${JSON.stringify(data)}`),
-  patch: (url, data) =>
-    Promise.resolve(`AXIOS patch on, ${url} with ${JSON.stringify(data)}`),
-};
+const { axios } = require("./axios-mock.js");
+const { isQuery, METHODS } = require("./query.js");
+
+const compose =
+  (...fns) =>
+  (arg) =>
+    fns.reduce((composed, f) => f(composed), arg);
 
 class ApiBuilder {
-  static methods = {
-    GET: "get",
-    DELETE: "delete",
-    POST: "post",
-    PUT: "put",
-    PATCH: "patch",
-  };
   static domains = {};
-  static handlers = {};
 
   static setDomains(map) {
     this.domains = map;
-    return ApiBuilder;
-  }
-
-  static setHandlers(map) {
-    this.handlers = map;
     return ApiBuilder;
   }
 
@@ -42,56 +26,30 @@ class ApiBuilder {
 
   buildApi(schema, reference = this.api) {
     for (const [key, value] of Object.entries(schema)) {
-      const isGroup = typeof value === "object";
-
-      if (isGroup) this.buildApi(value, (reference[key] = {}));
-      else reference[key] = this.createHandler(value);
+      if (isQuery(value)) reference[key] = this.createHandler(value);
+      else this.buildApi(value, (reference[key] = {}));
     }
   }
 
-  createHandler(template) {
-    this.validate(template);
+  createHandler(query) {
+    this.validate(query);
     return async (params = {}) => {
-      const { httpMethod, url, payload, handler } = this.preprocess(
-        template,
-        params
-      );
+      const { method, url, payload, handler } = this.preprocess(query, params);
 
-      return axios[httpMethod](url, payload).then(handler);
+      return axios[method](url, payload).then(handler);
     };
   }
 
-  preprocess(template, parameters = {}) {
-    const [method, url, arrow, ...fnNames] = template.split(/\s+/);
-
+  preprocess(query, parameters = {}) {
     return {
-      httpMethod: ApiBuilder.methods[method],
-      url: url.replace(/{{(.*?)}}/g, (match, $1) => {
-        const [param] = $1.split(":");
+      method: query.method,
+      url: query.url.replace(/{{(.*?)}}/g, (match, $1) => {
+        const [param] = $1.split(":"); // param:boolean
         return parameters[param] ?? ApiBuilder.domains[param];
       }),
       payload: parameters.payload,
-      handler: this.getComposedHandler(fnNames),
+      handler: compose(...query.handlers),
     };
-  }
-
-  getComposedHandler(fnNames) {
-    const handlers = fnNames.map((name) => ApiBuilder.handlers[name]);
-    return (arg) => handlers.reduce((composed, f) => f(composed), arg);
-  }
-
-  get templateRegex() {
-    const methods = Object.keys(ApiBuilder.methods).join("|");
-    const domains = Object.keys(ApiBuilder.domains).join("|");
-    const handlers = Object.keys(ApiBuilder.handlers).join("\\b|");
-
-    const METHOD = `(${methods})`;
-    const DOMAIN = `{{(${domains})}}`;
-    const PATH = "[\\w\\/{}:\\=\\?\\&]*";
-    const END = "$";
-    const HANDLER = `\\s+=>\\s+(\\b${handlers}\\b|\\s){1,}$`;
-
-    return new RegExp(`${METHOD}\\s+${DOMAIN}${PATH}(${END}|${HANDLER})`);
   }
 
   logError(template) {
@@ -101,20 +59,26 @@ class ApiBuilder {
     console.log(color, template);
     console.log(color, "Please make sure that");
 
+    const domainsList = Object.keys(ApiBuilder.domains);
+
     console.table({
-      Method: `One of: ${Object.keys(ApiBuilder.methods).join(", ")}`,
-      Domain: `One of: ${Object.keys(ApiBuilder.domains).join(", ")}`,
-      Handler: `One of: ${Object.keys(ApiBuilder.handlers).join(", ")}`,
-      Space: `METHOD {{DOMAIN}}/PATH => HANDLER1 HANDLER2`,
-      Arrow: "=>",
+      Method: `One of: ${Object.keys(METHODS).join(", ")}`,
+      Domain: `One of: ${domainsList.join(", ")}`,
+      Example: `GET {{${domainsList[0]}}}/path/{{id:number}} => \${fn1} \${fn2}`,
     });
 
     throw new Error("Can not parse api template");
   }
 
-  validate(template) {
-    const isValid = this.templateRegex.test(template);
-    if (!isValid) this.logError(template);
+  validate(query) {
+    const domains = Object.keys(ApiBuilder.domains).join("|");
+    const DOMAIN = `{{(${domains})}}`;
+    const PATH = "[\\w\\/{}:\\=\\?\\&]*";
+
+    const isValid =
+      Boolean(query.method) && new RegExp(`${DOMAIN}${PATH}`).test(query.url);
+
+    if (!isValid) this.logError(query.template);
   }
 }
 
