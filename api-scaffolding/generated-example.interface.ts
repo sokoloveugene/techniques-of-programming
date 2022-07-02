@@ -1,37 +1,37 @@
 export interface IClientService {
-  get(params: {
+  get<R>(params: {
     id: number,
-  }): Promise<any>;
-  update(params: {
+  }): Promise<R>;
+  update<R, P = unknown>(params: {
     id: number,
     isPrimary: boolean,
-    payload?: any,
-  }): Promise<any>;
+    payload?: P,
+  }): Promise<R>;
 };
 
 export interface IAddService {
-  primary(params: {
+  primary<R, P = unknown>(params: {
     productType: string,
     hasSubproducts: boolean,
-    payload?: any,
-  }): Promise<any>;
-  default(params: {
+    payload?: P,
+  }): Promise<R>;
+  default<R, P = unknown>(params: {
     productType: string,
     hasSubproducts: boolean,
-    payload?: any,
-  }): Promise<any>;
+    payload?: P,
+  }): Promise<R>;
 };
 
 export interface IProductService {
-  delete(params: {
+  delete<R>(params: {
     productId: number,
     productType: string,
-  }): Promise<any>;
+  }): Promise<R>;
   add: IAddService,
 };
 
 export interface IRootService {
-  heartbeat(): Promise<any>;
+  heartbeat<R>(): Promise<R>;
   client: IClientService,
   product: IProductService,
 };

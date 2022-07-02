@@ -3,14 +3,8 @@ const path = require("path");
 const { schema } = require("./api.schema.js");
 const { isQuery } = require("./query.js");
 
-const options = {
-  payloadPropName: "payload",
-  payloadType: "any",
-};
-
 class ApiInterfaceBuilder {
   constructor(schema) {
-    Object.assign(this, options);
     this.generatedInterfaces = new Set();
     this.getInterface("RootService", schema);
   }
@@ -21,9 +15,10 @@ class ApiInterfaceBuilder {
     parts.push(`export interface ${this.getInterfaceName(name)} {`);
 
     for (const [field, value] of Object.entries(schema)) {
-      if (isQuery(value))
-        parts.push(`${this.space}${field}${this.getMethod(value)}`);
-      else {
+      if (isQuery(value)) {
+        const generic = `<R${value.hasPayload ? ", P = unknown" : ""}>`;
+        parts.push(`${this.space}${field}${generic}${this.getMethod(value)}`);
+      } else {
         parts.push(`${this.space}${field}: ${this.getInterfaceName(field)},`);
         this.getInterface(field, value);
       }
@@ -35,10 +30,9 @@ class ApiInterfaceBuilder {
 
   getMethod(query) {
     const listOfParams = this.getArgumentList(query.url);
-    const hasPayload = ["post", "put", "patch"].includes(query.method);
-    const hasParam = listOfParams.length !== 0 || hasPayload;
+    const hasParam = listOfParams.length !== 0 || query.hasPayload;
 
-    if (!hasParam) return `(): ${this.returnType()}`;
+    if (!hasParam) return `(): ${this.returnType}`;
 
     const parts = [];
     parts.push("(params: {");
@@ -48,14 +42,12 @@ class ApiInterfaceBuilder {
       parts.push(`${this.space.repeat(2)}${name}: ${type},`);
     }
 
-    if (hasPayload) {
-      parts.push(
-        `${this.space.repeat(2)}${this.payloadPropName}?: ${this.payloadType},`
-      );
+    if (query.hasPayload) {
+      parts.push(`${this.space.repeat(2)}payload?: P,`);
     }
 
     parts.push(`${this.space}})`);
-    return parts.join("\n").concat(`: ${this.returnType()}`);
+    return parts.join("\n").concat(`: ${this.returnType}`);
   }
 
   getArgumentList(template) {
@@ -74,8 +66,8 @@ class ApiInterfaceBuilder {
     return base.endsWith("Service") ? base : `${base}Service`;
   }
 
-  returnType(generic = "any") {
-    return `Promise<${generic}>;`;
+  get returnType() {
+    return `Promise<R>;`;
   }
 
   get space() {

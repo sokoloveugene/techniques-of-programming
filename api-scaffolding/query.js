@@ -13,6 +13,7 @@ const query = (method, [template], ...handlers) => {
 
   return {
     type: TYPE,
+    hasPayload: [METHODS.POST, METHODS.PUT, METHODS.PATCH].includes(method),
     method,
     url,
     handlers: handlers.filter((f) => typeof f === "function"),
