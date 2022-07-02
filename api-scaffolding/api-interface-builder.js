@@ -1,15 +1,16 @@
-const { schema } = require("./api.schema.js");
 const fs = require("fs");
 const path = require("path");
+const { schema } = require("./api.schema.js");
+const { isQuery } = require("./query.js");
 
-const defaultOptions = {
+const options = {
   payloadPropName: "payload",
   payloadType: "any",
 };
 
 class ApiInterfaceBuilder {
-  constructor(schema, options) {
-    Object.assign(this, { ...options, ...defaultOptions });
+  constructor(schema) {
+    Object.assign(this, options);
     this.generatedInterfaces = new Set();
     this.getInterface("RootService", schema);
   }
@@ -20,11 +21,11 @@ class ApiInterfaceBuilder {
     parts.push(`export interface ${this.getInterfaceName(name)} {`);
 
     for (const [field, value] of Object.entries(schema)) {
-      if (this.isGroup(value)) {
+      if (isQuery(value))
+        parts.push(`${this.space}${field}${this.getMethod(value)}`);
+      else {
         parts.push(`${this.space}${field}: ${this.getInterfaceName(field)},`);
         this.getInterface(field, value);
-      } else {
-        parts.push(`${this.space}${field}${this.getMethod(value)}`);
       }
     }
 
@@ -32,10 +33,12 @@ class ApiInterfaceBuilder {
     this.generatedInterfaces.add(parts.join("\n"));
   }
 
-  getMethod(template) {
-    const listOfParams = this.getArgumentList(template);
+  getMethod(query) {
+    const listOfParams = this.getArgumentList(query.url);
+    const hasPayload = ["post", "put", "patch"].includes(query.method);
+    const hasParam = listOfParams.length !== 0 || hasPayload;
 
-    if (listOfParams.length === 0) return `(): ${this.returnType()}`;
+    if (!hasParam) return `(): ${this.returnType()}`;
 
     const parts = [];
     parts.push("(params: {");
@@ -45,7 +48,7 @@ class ApiInterfaceBuilder {
       parts.push(`${this.space.repeat(2)}${name}: ${type},`);
     }
 
-    if (this.hasPayload(template)) {
+    if (hasPayload) {
       parts.push(
         `${this.space.repeat(2)}${this.payloadPropName}?: ${this.payloadType},`
       );
@@ -73,16 +76,6 @@ class ApiInterfaceBuilder {
 
   returnType(generic = "any") {
     return `Promise<${generic}>;`;
-  }
-
-  isGroup(value) {
-    return typeof value === "object";
-  }
-
-  hasPayload(template) {
-    return ["POST", "PUT", "PATCH"].some((method) =>
-      template.startsWith(method)
-    );
   }
 
   get space() {
