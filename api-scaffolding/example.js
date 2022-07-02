@@ -8,16 +8,19 @@ const domains = {
 
 const api = ApiBuilder.setDomains(domains).from(schema);
 
+// AXIOS get on, http://localhost:4200/api/customer/123 DECORATED TO JSON
 api.client.get({
   id: 123,
 });
 
+// AXIOS patch on, http://localhost:8000/customer/123?primary=true with {"age":18,"hobby":"Java"}
 api.client.update({
   id: 123,
   isPrimary: true,
   payload: { age: 18, hobby: "Java" },
 });
 
+// AXIOS put on, http://localhost:8000/product/primary/pants?subproducts=true with {"size":"S","color":"black"}
 api.product.add.primary({
   hasSubproducts: true,
   productType: "pants",

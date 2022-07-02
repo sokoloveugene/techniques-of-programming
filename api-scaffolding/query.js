@@ -8,28 +8,23 @@ const METHODS = {
 
 const TYPE = "__query__";
 
-const isQuery = (val) => {
-  return Boolean(val) && typeof val === "object" && val["type"] === TYPE;
-};
-
-const isFunction = (v) => typeof v === "function";
-
-const query = ([template], ...handlers) => {
-  const [method, url] = template.split(/\s+/);
-
-  const lambas = new Array(handlers.length).fill("[λ]").join(" ");
+const query = (method, [template], ...handlers) => {
+  const [url] = template.split(/\s+/);
 
   return {
     type: TYPE,
-    method: METHODS[method],
+    method,
     url,
-    handlers: handlers.filter(isFunction),
-    template: `${template} ${lambas}`.replace(/\s{2,}/g, " "),
+    handlers: handlers.filter((f) => typeof f === "function"),
   };
 };
 
 module.exports = {
-  query,
-  isQuery,
-  METHODS,
+  GET: query.bind(null, METHODS.GET),
+  POST: query.bind(null, METHODS.POST),
+  PUT: query.bind(null, METHODS.PUT),
+  PATCH: query.bind(null, METHODS.PATCH),
+  DELETE: query.bind(null, METHODS.DELETE),
+  isQuery: (val) =>
+    Boolean(val) && typeof val === "object" && val["type"] === TYPE,
 };
