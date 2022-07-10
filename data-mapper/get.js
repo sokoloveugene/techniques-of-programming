@@ -2,7 +2,7 @@ const isObject = (val) => val && typeof val === "object";
 const isNullOrUndefined = (val) => val === null || val === undefined;
 const isUndefined = (val) => val === undefined;
 
-export const get = (obj, path, defaultValue) => {
+const get = (obj, path, defaultValue) => {
   if (!path || !isObject(obj)) {
     return defaultValue;
   }
@@ -19,4 +19,8 @@ export const get = (obj, path, defaultValue) => {
       ? defaultValue
       : obj[path]
     : result;
+};
+
+module.exports = {
+  get,
 };
