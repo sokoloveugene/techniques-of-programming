@@ -11,6 +11,7 @@ const api = ApiBuilder.setDomains(domains).from(schema);
 // AXIOS get on, http://localhost:4200/api/customer/123 DECORATED TO JSON
 api.client.get({
   id: 123,
+  config: { headers: { "X-Requested-With": "XMLHttpRequest" } },
 });
 
 // AXIOS patch on, http://localhost:8000/customer/123?primary=true with {"age":18,"hobby":"Java"}
@@ -25,4 +26,5 @@ api.product.add.primary({
   hasSubproducts: true,
   productType: "pants",
   payload: { size: "S", color: "black" },
+  config: { headers: { "X-Requested-With": "XMLHttpRequest" } },
 });

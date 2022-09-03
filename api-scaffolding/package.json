@@ -1,0 +1,14 @@
+{
+  "name": "api-scaffolding",
+  "version": "1.0.0",
+  "description": "",
+  "main": "api-builder.js",
+  "scripts": {
+    "types": "node api-interface-builder.js -i ./api.schema.js -o ./output.ts"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "prettier": "2.7.1"
+  }
+}

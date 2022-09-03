@@ -33,9 +33,14 @@ class ApiBuilder {
 
   createHandler(query) {
     return async (params = {}) => {
-      const { method, url, payload, handler } = this.preprocess(query, params);
+      const { method, url, payload, handler, config } = this.preprocess(
+        query,
+        params
+      );
 
-      return axios[method](url, payload).then(handler);
+      return axios[method]
+        .apply(null, query.hasPayload ? [url, payload, config] : [url, config])
+        .then(handler);
     };
   }
 
@@ -47,6 +52,7 @@ class ApiBuilder {
         return parameters[param] ?? ApiBuilder.domains[param];
       }),
       payload: parameters.payload,
+      config: parameters.config,
       handler: compose(...query.handlers),
     };
   }
